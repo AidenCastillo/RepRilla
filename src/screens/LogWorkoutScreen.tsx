@@ -1,75 +1,155 @@
 import React, { useState } from "react";
-import { View, TextInput, Button, StyleSheet, Alert, Text } from "react-native";
+import { View, TextInput, Button, StyleSheet, Alert, Text, ScrollView } from "react-native";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../context/AuthContext";
 
 export default function LogWorkoutScreen() {
-  const [exercise, setExercise] = useState("");
-  const [reps, setReps] = useState("");
-  const [weight, setWeight] = useState("");
   const { user } = useAuth();
 
-  const handleLogWorkout = async () => {
-    if (!exercise || !reps || !weight) {
-      Alert.alert("Missing fields", "Please fill out all fields.");
-      return;
+  const [date, setDate] = useState(new Date());
+  const [exercises, setExercise] = useState([
+    {
+      name: "",
+      sets: [{
+        reps: 0,
+        weight: 0,
+      }]
     }
+  ]);
+  
+  const updateExerciseName = (i: number, name: string) => {
+    const newExercise = [...exercises];
+    newExercise[i].name = name;
+    setExercise(newExercise);
+  }
 
-    try {
-      await addDoc(collection(db, `users/${user?.uid}/workouts`), {
-        exercise,
-        reps: parseInt(reps),
-        weight: parseFloat(weight),
-        timestamp: serverTimestamp(),
-      });
+  // ei = exercise index, si = set index
+  const updateSet = (ei: number, si: number, field: "reps" | "weight", value: string) => {
+    const newExcercise = [...exercises];
+    newExcercise[ei].sets[si][field] = Number(value);
+    setExercise(newExcercise);
+  }
 
-      Alert.alert("Success", "Workout logged!");
-      setExercise("");
-      setReps("");
-      setWeight("");
-    } catch (error: any) {
-      Alert.alert("Error", error.message);
-    }
+  const addExercise = () => {
+    setExercise([...exercises, { name: "", sets: [{ reps: 0, weight: 0}] }]);
+  }
+
+  const addSet = (i: number) => {
+    const newExercise = [...exercises];
+    newExercise[i].sets.push({ reps: 0, weight: 0});
+    setExercise(newExercise);
   };
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Log a Workout</Text>
-
-      <TextInput
-        placeholder="Exercise (e.g. Bench Press)"
-        style={styles.input}
-        value={exercise}
-        onChangeText={setExercise}
-      />
-      <TextInput
-        placeholder="Reps"
-        style={styles.input}
-        value={reps}
-        onChangeText={setReps}
-        keyboardType="numeric"
-      />
-      <TextInput
-        placeholder="Weight (lbs)"
-        style={styles.input}
-        value={weight}
-        onChangeText={setWeight}
-        keyboardType="numeric"
-      />
-      <Button title="Log Workout" onPress={handleLogWorkout} />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", padding: 24 },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  title: { fontSize: 24, fontWeight: "bold", marginBottom: 24, textAlign: "center" },
+  const handleSubmit = async () => {
+    try {
+      await addDoc(collection(db, `users/${user?.uid}/workouts`), {
+        date,
+        exercises,
+        timestamp: serverTimestamp(),
+      });
+      Alert.alert("Workout logged successfully!");
+      setExercise([{ name: "", sets: [{ reps: 0, weight: 0}] }]);
+    } catch (error: any) {
+      console.error("Error logging workout:", error);
+      Alert.alert("Error logging workout", error.message);
+    }
+  }
+  
+  const styles = StyleSheet.create({
+    container: { padding: 20, paddingBottom: 100 },
+    title: { fontSize: 24, fontWeight: "bold", marginBottom: 20, textAlign: "center" },
+    input: {
+      borderWidth: 1,
+      padding: 10,
+      borderRadius: 8,
+      marginBottom: 10,
+    },
+    exerciseBlock: {
+      marginBottom: 20,
+      padding: 10,
+      borderColor: "#ccc",
+      borderWidth: 1,
+      borderRadius: 8,
+    },
+    setRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 8,
+    },
+    smallInput: {
+      flex: 1,
+      borderWidth: 1,
+      padding: 8,
+      marginRight: 8,
+      borderRadius: 6,
+    },
+    inputLabel: {
+      fontSize: 16,
+      marginBottom: 4,
+      color: '#666',
+    },
+    setLabel: {
+      fontSize: 14,
+      color: '#666',
+      marginBottom: 2,
+    },
+    setNumber: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      marginBottom: 8,
+    },
+    inputGroup: {
+      marginBottom: 10,
+    }
 });
+  return (
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.title}>Log Workout</Text>
+
+      {exercises.map((exercise, ei) => (
+        <View key={ei} style={styles.exerciseBlock}>
+          <Text style={styles.inputLabel}>Exercise Name</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Exercise Name"
+            value={exercise.name}
+            onChangeText={(text) => updateExerciseName(ei, text)}
+          />
+          {exercise.sets.map((set, si) => (
+            <View key={si}>
+              <Text style={styles.setNumber}>Set {si + 1}</Text>
+              <View style={styles.setRow}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.setLabel}>Reps</Text>
+                  <TextInput
+                    style={styles.smallInput}
+                    placeholder="0"
+                    keyboardType="numeric"
+                    value={set.reps.toString()}
+                    onChangeText={(text) => updateSet(ei, si, "reps", text)}
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.setLabel}>Weight (kg)</Text>
+                  <TextInput
+                    style={styles.smallInput}
+                    placeholder="0"
+                    keyboardType="numeric"
+                    value={set.weight.toString()}
+                    onChangeText={(text) => updateSet(ei, si, "weight", text)}
+                  />
+                </View>
+              </View>
+            </View>
+          ))}
+          <Button title="Add Set" onPress={() => addSet(ei)} />
+        </View>
+      ))}
+      <Button title="Add Exercise" onPress={addExercise} />
+      <Button title="Submit Workout" onPress={handleSubmit} />
+    </ScrollView>
+  )
+
+  
+};
