@@ -28,7 +28,7 @@ const HomeScreen: React.FC = () => {
                 </View>
             </View>
             <View style={styles.adContainer}>
-                <AdBanner />
+                {/* <AdBanner /> */}
             </View>
         </View>
     );
